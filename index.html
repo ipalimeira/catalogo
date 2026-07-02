@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catálogo de Vídeos — IPA Limeira</title>
+<meta name="description" content="Catálogo pesquisável dos vídeos do canal do YouTube da Igreja Presbiteriana Aliança Limeira.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <p class="eyebrow">Igreja Presbiteriana Aliança — Limeira</p>
+    <h1 class="title">Catálogo de vídeos</h1>
+    <p class="stats-line" id="stats">Carregando…</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="search" type="text" placeholder="Buscar por título, preletor, texto base...">
+    </div>
+    <select id="f-preletor"><option value="">Preletor</option></select>
+    <select id="f-tipo"><option value="">Tipo</option></select>
+    <select id="f-livro"><option value="">Livro</option></select>
+    <select id="f-ano"><option value="">Ano</option></select>
+    <button class="clear-btn" id="clear-filters">Limpar filtros</button>
+    <div class="view-toggle">
+      <button id="view-grade" class="active">Grade</button>
+      <button id="view-livro">Por livro</button>
+    </div>
+  </div>
+  <p class="result-count" id="result-count"></p>
+</div>
+
+<div class="wrap">
+  <div class="grid" id="grid"></div>
+  <div id="shelf" style="display:none;"></div>
+</div>
+
+<footer class="site">
+  <div class="wrap">
+    Catálogo estático gerado a partir dos vídeos publicados no canal. Dados de preletor, texto base e tema são curados manualmente; título, data, duração e miniatura vêm do YouTube.
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
