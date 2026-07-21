@@ -1,44 +1,28 @@
-# Catálogo de vídeos — IPA Limeira
+# Catálogo de vídeos — IPA Limeira (v2)
 
-Site estático de busca para os vídeos do canal do YouTube da igreja. Sem
-banco de dados, sem servidor: os dados ficam em `data/videos.json` e a
-página inteira roda no navegador de quem acessa.
-
-## Estrutura
-
+## Arquivos
 ```
-index.html      página única
-style.css       estilos
-app.js          busca, filtros, grade, "por livro" e modal de vídeo
-data/videos.json   564 vídeos (2011–2021), extraídos da planilha original
+index.html, style.css, app.js   → front-end (não mude quando atualizar dados)
+gerar_catalogo.py               → gera data/videos.json e data/playlists.json
+data/videos.json, data/playlists.json → já gerados a partir da planilha v8 (922 vídeos)
 ```
 
-## Como publicar no GitHub Pages
+## Publicar / atualizar
+1. Suba tudo pra raiz do repositório `ipalimeira/catalogo` (substitui os arquivos da v1).
+2. Pages já deve continuar ativo em Settings → Pages. Se não: Branch `main` / `(root)`.
+3. Sempre que a planilha for atualizada, rode de novo, sem mexer no site:
+   ```
+   pip install openpyxl --break-system-packages
+   python3 gerar_catalogo.py planilha_nova.xlsx --saida .
+   ```
+   Isso só regrava `data/videos.json` e `data/playlists.json`. Suba só esses dois arquivos.
 
-1. Suba estes 4 arquivos/pasta para a raiz do repositório `ipalimeira/catalogo`.
-2. No repositório: **Settings → Pages → Build and deployment → Source: Deploy
-   from a branch → Branch: main / (root)**.
-3. Aguarde 1–2 minutos. O site fica em:
-   `https://ipalimeira.github.io/catalogo/`
-
-## Como testar localmente antes de subir
-
-Não abra o `index.html` clicando duas vezes — o navegador bloqueia o
-carregamento do `data/videos.json` quando o arquivo é aberto direto do
-disco (`file://`). Suba um servidor local simples:
-
+## Teste local
 ```
-cd site
 python3 -m http.server 8000
 ```
+(não abra o index.html clicando duas vezes — o fetch do JSON é bloqueado em file://)
 
-E acesse `http://localhost:8000` no navegador.
-
-## O que falta para a próxima etapa (sincronização automática)
-
-Este V0 tem apenas os 564 vídeos já catalogados na planilha (até
-abril/2021). Os campos `preletor`, `texto_base`, `livro` e
-`temas_teologicos` são curados manualmente; `titulo`, `data`, `duracao`,
-`thumbnail_url` etc. podem futuramente vir automaticamente da API do
-YouTube. Isso é assunto da próxima etapa (script + GitHub Actions), ainda
-não incluído aqui.
+## O que ficou de fora por enquanto
+- Sincronização automática com a API do YouTube (ainda é você quem exporta a planilha).
+- A aba "Tópicos" da planilha (taxonomia teológica) não está ligada aos vídeos ainda — é insumo pra uma futura categorização por tema.

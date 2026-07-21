@@ -7,46 +7,83 @@
 <meta name="description" content="Catálogo pesquisável dos vídeos do canal do YouTube da Igreja Presbiteriana Aliança Limeira.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header class="site">
   <div class="wrap">
+    <svg class="rings" viewBox="0 0 100 100" fill="none" stroke="#fff" stroke-width="2">
+      <circle cx="38" cy="50" r="26"/><circle cx="62" cy="50" r="26"/>
+    </svg>
     <p class="eyebrow">Igreja Presbiteriana Aliança — Limeira</p>
     <h1 class="title">Catálogo de vídeos</h1>
-    <p class="stats-line" id="stats">Carregando…</p>
+    <div class="metrics">
+      <div class="metric"><span class="metric-value" id="metric-total">—</span><span class="metric-label">vídeos</span></div>
+      <div class="metric"><span class="metric-value" id="metric-preletores">—</span><span class="metric-label">preletores</span></div>
+      <div class="metric"><span class="metric-value" id="metric-playlists">—</span><span class="metric-label">playlists</span></div>
+      <div class="metric"><span class="metric-value" id="metric-anos">—</span><span class="metric-label">período</span></div>
+    </div>
   </div>
 </header>
 
 <div class="wrap">
+  <div class="stats-toggle-wrap">
+    <button class="stats-toggle" id="stats-toggle">📊 Ver estatísticas</button>
+  </div>
+  <div class="charts-panel" id="charts-panel">
+    <div class="chart-card"><h3>Top preletores</h3><canvas id="chart-preletores"></canvas></div>
+    <div class="chart-card"><h3>Antigo × Novo Testamento</h3><canvas id="chart-testamento"></canvas></div>
+    <div class="chart-card"><h3>Vídeos por ano</h3><canvas id="chart-anos"></canvas></div>
+  </div>
+
   <div class="controls">
     <div class="search-box">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="search" type="text" placeholder="Buscar por título, preletor, texto base...">
     </div>
     <select id="f-preletor"><option value="">Preletor</option></select>
-    <select id="f-tipo"><option value="">Tipo</option></select>
+    <select id="f-categoria"><option value="">Categoria</option></select>
     <select id="f-livro"><option value="">Livro</option></select>
     <select id="f-ano"><option value="">Ano</option></select>
-    <button class="clear-btn" id="clear-filters">Limpar filtros</button>
-    <div class="view-toggle">
-      <button id="view-grade" class="active">Grade</button>
-      <button id="view-livro">Por livro</button>
+    <select id="f-playlist"><option value="">Playlist</option></select>
+    <div class="segmented">
+      <button data-testamento="" class="active">Todos</button>
+      <button data-testamento="AT">AT</button>
+      <button data-testamento="NT">NT</button>
     </div>
+    <select id="f-sort">
+      <option value="recente">Mais recente</option>
+      <option value="antigo">Mais antigo</option>
+      <option value="aleatorio">Aleatório</option>
+      <option value="titulo">Título A–Z</option>
+      <option value="duracao_desc">Maior duração</option>
+      <option value="duracao_asc">Menor duração</option>
+    </select>
+    <div class="view-toggle">
+      <button data-view="grade" class="active" title="Grade"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg></button>
+      <button data-view="lista" title="Lista"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="4" width="7" height="6" rx="1"/><rect x="12" y="5" width="9" height="1.6"/><rect x="12" y="8" width="9" height="1.6"/><rect x="3" y="14" width="7" height="6" rx="1"/><rect x="12" y="15" width="9" height="1.6"/><rect x="12" y="18" width="9" height="1.6"/></svg></button>
+      <button data-view="compacta" title="Compacta"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="4" width="18" height="2.2" rx="1"/><rect x="3" y="11" width="18" height="2.2" rx="1"/><rect x="3" y="18" width="18" height="2.2" rx="1"/></svg></button>
+    </div>
+    <button class="clear-btn" id="clear-filters">Limpar filtros</button>
   </div>
-  <p class="result-count" id="result-count"></p>
+
+  <div class="result-bar">
+    <p class="result-count" id="result-count"></p>
+    <div class="playlist-banner" id="playlist-banner"></div>
+  </div>
 </div>
 
 <div class="wrap">
   <div class="grid" id="grid"></div>
-  <div id="shelf" style="display:none;"></div>
+  <div class="list" id="list" style="display:none;"></div>
+  <div class="compact" id="compact" style="display:none;"></div>
 </div>
 
 <footer class="site">
   <div class="wrap">
-    Catálogo estático gerado a partir dos vídeos publicados no canal. Dados de preletor, texto base e tema são curados manualmente; título, data, duração e miniatura vêm do YouTube.
+    Catálogo estático gerado a partir dos vídeos publicados no canal. Título, data, duração, miniatura e playlist vêm do YouTube; preletor, texto base e livro são curados manualmente.
   </div>
 </footer>
 
