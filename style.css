@@ -155,8 +155,9 @@ h1.title{
 
 .chart-hint{font-size:12px; color:var(--ink-faint); margin:-6px 0 14px;}
 
-.chart-card canvas{max-height:280px;}
-.chart-card-wide canvas{max-height:280px;}
+.chart-box{position:relative; height:220px;}
+.chart-box-tall{height:340px;}
+.chart-box canvas{width:100% !important; height:100% !important;}
 
 /* ---------- navegação por livro (barras clicáveis) ---------- */
 .livro-testamento-label{

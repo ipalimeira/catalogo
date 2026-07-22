@@ -33,14 +33,43 @@ function catColor(cat){
   return CAT_COLORS[cat];
 }
 
-function buildFilters(){
-  fillSelect($('#f-preletor'), [...new Set(ALL.map(v=>v.preletor).filter(Boolean))].sort(), 'Preletor');
-  fillSelect($('#f-categoria'), [...new Set(ALL.map(v=>v.categoria).filter(Boolean))].sort(), 'Categoria');
-  fillSelect($('#f-ano'), [...new Set(ALL.map(v=>v.ano).filter(Boolean))].sort((a,b)=>b-a), 'Ano');
-  const livros = [...new Set(ALL.map(v=>v.livro).filter(Boolean))].sort((a,b)=>BOOK_ORDER.indexOf(a)-BOOK_ORDER.indexOf(b));
-  fillSelect($('#f-livro'), livros, 'Livro');
-  const pls = PLAYLISTS.slice().sort((a,b)=>b.count-a.count);
-  fillSelect($('#f-playlist'), pls.map(p=>p.playlist_name), 'Playlist');
+function computePool(excludeKey){
+  let out = ALL;
+  if(excludeKey!=='preletor' && state.preletor) out = out.filter(v=>v.preletor===state.preletor);
+  if(excludeKey!=='categoria' && state.categoria) out = out.filter(v=>v.categoria===state.categoria);
+  if(excludeKey!=='livro' && state.livro) out = out.filter(v=>v.livro===state.livro);
+  if(state.testamento) out = out.filter(v=>v.testamento===state.testamento);
+  if(excludeKey!=='ano' && state.ano) out = out.filter(v=>String(v.ano)===String(state.ano));
+  if(excludeKey!=='playlist' && state.playlist) out = out.filter(v=>v.playlist_name===state.playlist);
+  if(state.q.trim()){
+    const ids = new Set(fuse.search(state.q.trim()).map(r=>r.item.video_id));
+    out = out.filter(v=>ids.has(v.video_id));
+  }
+  return out;
+}
+
+const FILTER_SPECS = [
+  { id:'f-preletor', key:'preletor', placeholder:'Preletor', getter:v=>v.preletor, sort:(a,b)=>a.localeCompare(b) },
+  { id:'f-categoria', key:'categoria', placeholder:'Categoria', getter:v=>v.categoria, sort:(a,b)=>a.localeCompare(b) },
+  { id:'f-livro', key:'livro', placeholder:'Livro', getter:v=>v.livro, sort:(a,b)=>BOOK_ORDER.indexOf(a)-BOOK_ORDER.indexOf(b) },
+  { id:'f-ano', key:'ano', placeholder:'Ano', getter:v=>v.ano, sort:(a,b)=>b-a },
+  { id:'f-playlist', key:'playlist', placeholder:'Playlist', getter:v=>v.playlist_name, sort:(a,b)=>a.localeCompare(b) },
+];
+
+function updateFilterOptions(){
+  FILTER_SPECS.forEach(spec=>{
+    const pool = computePool(spec.key);
+    const values = [...new Set(pool.map(spec.getter).filter(v=>v!==null && v!==undefined && v!==''))].sort(spec.sort);
+    const el = $('#'+spec.id);
+    const current = state[spec.key];
+    fillSelect(el, values, spec.placeholder);
+    if(current && values.map(String).includes(String(current))){
+      el.value = current;
+    } else if(current){
+      state[spec.key] = '';
+      el.value = '';
+    }
+  });
 }
 
 function shuffle(arr, seed){
@@ -144,6 +173,7 @@ function updatePlaylistBanner(){
 }
 
 function render(){
+  updateFilterOptions();
   const filtered = applyFilters();
   resultCount.textContent = `${filtered.length} vídeo${filtered.length===1?'':'s'} encontrado${filtered.length===1?'':'s'}`;
   updatePlaylistBanner();
@@ -282,12 +312,14 @@ function buildCharts(){
   const topPreletores = Object.entries(byPreletor).sort((a,b)=>b[1]-a[1]).slice(0,10);
   new Chart($('#chart-preletores'), {
     type:'bar',
-    data:{ labels:topPreletores.map(p=>p[0].replace(/\s*\(.*\)/,'')), datasets:[{ data:topPreletores.map(p=>p[1]), backgroundColor:'#2F5F49', borderRadius:4, barThickness:16 }] },
+    data:{ labels:topPreletores.map(p=>p[0].replace(/\s*\(.*\)/,'')), datasets:[{ data:topPreletores.map(p=>p[1]), backgroundColor:'#2F5F49', borderRadius:4, maxBarThickness:20, categoryPercentage:0.7, barPercentage:0.9 }] },
     options:{
       indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:false,
       layout:{padding:{right:34}},
       plugins:{legend:{display:false}},
-      scales:{x:{grid:{color:gridColor}, ticks:{font:{size:11}}}, y:{grid:{display:false}, ticks:{font:{size:12}}}}
+      scales:{x:{grid:{color:gridColor}, ticks:{font:{size:11}}}, y:{grid:{display:false}, ticks:{font:{size:11.5}}}}
     },
     plugins:[valueLabelsPlugin]
   });
@@ -302,7 +334,7 @@ function buildCharts(){
       labels:[`Antigo Testamento (${byTest.AT})`, `Novo Testamento (${byTest.NT})`],
       datasets:[{ data:[byTest.AT, byTest.NT], backgroundColor:['#C99A3E','#2F5F49'] }]
     },
-    options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}} },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}} },
     plugins:[{
       id:'centerText',
       afterDraw(chart){
@@ -367,8 +399,6 @@ async function init(){
   PLAYLISTS = await playlistsRes.json();
 
   fuse = new Fuse(ALL, { keys:['titulo','preletor','texto_base','playlist_name','livro'], threshold:0.32, ignoreLocation:true });
-
-  buildFilters();
 
   const anos = ALL.map(v=>v.ano).filter(Boolean);
   const preletores = new Set(ALL.map(v=>v.preletor).filter(Boolean));
