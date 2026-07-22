@@ -249,38 +249,115 @@ function loadScript(src){
   });
 }
 
+const valueLabelsPlugin = {
+  id:'valueLabels',
+  afterDatasetsDraw(chart){
+    const {ctx} = chart;
+    ctx.save();
+    ctx.font = "600 11px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = '#182620';
+    chart.data.datasets.forEach((ds, di)=>{
+      const meta = chart.getDatasetMeta(di);
+      meta.data.forEach((bar, i)=>{
+        const val = ds.data[i];
+        if(chart.config.type==='bar' && chart.options.indexAxis==='y'){
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(val, bar.x + 6, bar.y);
+        }
+      });
+    });
+    ctx.restore();
+  }
+};
+
 function buildCharts(){
   const gridColor = '#DEE6DC';
   Chart.defaults.font.family = "'Manrope', sans-serif";
   Chart.defaults.color = '#51625A';
 
-  // top preletores
+  // top 10 preletores, com número ao lado da barra
   const byPreletor = {};
   ALL.forEach(v=>{ if(v.preletor) byPreletor[v.preletor]=(byPreletor[v.preletor]||0)+1; });
-  const topPreletores = Object.entries(byPreletor).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const topPreletores = Object.entries(byPreletor).sort((a,b)=>b[1]-a[1]).slice(0,10);
   new Chart($('#chart-preletores'), {
     type:'bar',
-    data:{ labels:topPreletores.map(p=>p[0].replace(/\s*\(.*\)/,'')), datasets:[{ data:topPreletores.map(p=>p[1]), backgroundColor:'#2F5F49', borderRadius:4 }] },
-    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{grid:{color:gridColor}}, y:{grid:{display:false}}} }
+    data:{ labels:topPreletores.map(p=>p[0].replace(/\s*\(.*\)/,'')), datasets:[{ data:topPreletores.map(p=>p[1]), backgroundColor:'#2F5F49', borderRadius:4, barThickness:16 }] },
+    options:{
+      indexAxis:'y',
+      layout:{padding:{right:34}},
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:gridColor}, ticks:{font:{size:11}}}, y:{grid:{display:false}, ticks:{font:{size:12}}}}
+    },
+    plugins:[valueLabelsPlugin]
   });
 
-  // AT x NT
+  // AT x NT com contagem e total no centro
   const byTest = {AT:0, NT:0};
   ALL.forEach(v=>{ if(v.testamento) byTest[v.testamento]++; });
+  const totalTest = byTest.AT + byTest.NT;
   new Chart($('#chart-testamento'), {
     type:'doughnut',
-    data:{ labels:['Antigo Testamento','Novo Testamento'], datasets:[{ data:[byTest.AT, byTest.NT], backgroundColor:['#C99A3E','#2F5F49'] }] },
-    options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}} }
+    data:{
+      labels:[`Antigo Testamento (${byTest.AT})`, `Novo Testamento (${byTest.NT})`],
+      datasets:[{ data:[byTest.AT, byTest.NT], backgroundColor:['#C99A3E','#2F5F49'] }]
+    },
+    options:{ plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}} },
+    plugins:[{
+      id:'centerText',
+      afterDraw(chart){
+        const {ctx, chartArea:{left,right,top,bottom}} = chart;
+        const cx = (left+right)/2, cy = (top+bottom)/2;
+        ctx.save();
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.font = "600 20px 'IBM Plex Mono', monospace";
+        ctx.fillStyle = '#182620';
+        ctx.fillText(totalTest, cx, cy-8);
+        ctx.font = "11px 'Manrope', sans-serif";
+        ctx.fillStyle = '#8C9990';
+        ctx.fillText('vídeos', cx, cy+12);
+        ctx.restore();
+      }
+    }]
   });
+}
 
-  // por ano
-  const byAno = {};
-  ALL.forEach(v=>{ if(v.ano) byAno[v.ano]=(byAno[v.ano]||0)+1; });
-  const anos = Object.keys(byAno).sort();
-  new Chart($('#chart-anos'), {
-    type:'bar',
-    data:{ labels:anos, datasets:[{ data:anos.map(a=>byAno[a]), backgroundColor:'#C99A3E', borderRadius:4 }] },
-    options:{ plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{grid:{color:gridColor}}} }
+function renderLivroNav(){
+  const counts = {};
+  ALL.forEach(v=>{ if(v.livro) counts[v.livro] = (counts[v.livro]||0)+1; });
+  const max = Math.max(1, ...Object.values(counts));
+  const OT_COUNT = 39;
+
+  const row = (name) => {
+    const c = counts[name] || 0;
+    const pct = Math.round((c/max)*100);
+    return `<div class="livro-row ${c===0?'is-empty':''}" data-livro="${name}">
+      <span class="livro-name">${name}</span>
+      <span class="livro-bar-track"><span class="livro-bar-fill" style="width:${c===0?0:Math.max(pct,4)}%"></span></span>
+      <span class="livro-count">${c}</span>
+    </div>`;
+  };
+
+  const ot = BOOK_ORDER.slice(0, OT_COUNT).filter(b=>counts[b]);
+  const nt = BOOK_ORDER.slice(OT_COUNT).filter(b=>counts[b]);
+
+  $('#livro-nav').innerHTML = `
+    <div class="livro-testamento-label">Antigo testamento</div>
+    ${ot.map(row).join('')}
+    <div class="livro-testamento-label">Novo testamento</div>
+    ${nt.map(row).join('')}
+  `;
+
+  $('#livro-nav').querySelectorAll('.livro-row:not(.is-empty)').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      state.livro = el.dataset.livro;
+      state.view = 'grade';
+      $('#f-livro').value = state.livro;
+      syncToggles();
+      render();
+      $('#charts-panel').classList.remove('open');
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
   });
 }
 
@@ -302,6 +379,7 @@ async function init(){
 
   bindControls();
   syncToggles();
+  renderLivroNav();
   render();
 }
 

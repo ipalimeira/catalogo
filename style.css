@@ -50,15 +50,31 @@ header.site{
   opacity:0.16;
 }
 
+.header-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  position:relative;
+}
+
 .eyebrow{
   font-family:var(--font-mono);
   font-size:12px;
   letter-spacing:0.12em;
   text-transform:uppercase;
   color:var(--gold);
-  margin:0 0 10px;
-  position:relative;
+  margin:0;
 }
+
+.header-social{display:flex; gap:14px; align-items:center;}
+.header-social a{
+  color:rgba(255,255,255,0.75);
+  display:flex;
+  transition:color .15s ease;
+}
+.header-social a:hover{color:var(--gold);}
+.header-social svg{width:17px; height:17px;}
 
 h1.title{
   font-family:var(--font-display);
@@ -112,7 +128,7 @@ h1.title{
 .charts-panel{
   display:none;
   gap:16px;
-  grid-template-columns:repeat(3, 1fr);
+  grid-template-columns:2fr 1fr;
   padding-bottom:18px;
 }
 
@@ -125,6 +141,8 @@ h1.title{
   padding:16px 18px;
 }
 
+.chart-card-full{grid-column:1 / -1;}
+
 .chart-card h3{
   font-family:var(--font-sans);
   font-size:13px;
@@ -135,7 +153,45 @@ h1.title{
   letter-spacing:0.04em;
 }
 
-.chart-card canvas{max-height:200px;}
+.chart-hint{font-size:12px; color:var(--ink-faint); margin:-6px 0 14px;}
+
+.chart-card canvas{max-height:280px;}
+.chart-card-wide canvas{max-height:280px;}
+
+/* ---------- navegação por livro (barras clicáveis) ---------- */
+.livro-testamento-label{
+  font-family:var(--font-mono);
+  font-size:11px;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  color:var(--gold-deep);
+  margin:16px 0 8px;
+}
+.livro-testamento-label:first-child{margin-top:0;}
+
+.livro-row{
+  display:grid;
+  grid-template-columns:130px 1fr 34px;
+  align-items:center;
+  gap:10px;
+  padding:3px 0;
+  cursor:pointer;
+}
+.livro-row.is-empty{cursor:default; opacity:0.35;}
+
+.livro-name{
+  font-size:12.5px;
+  color:var(--ink);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.livro-bar-track{background:var(--sage-bg); border-radius:4px; height:14px; overflow:hidden;}
+.livro-bar-fill{display:block; height:100%; background:var(--green-mid); border-radius:4px; transition:width .2s ease;}
+.livro-row:hover:not(.is-empty) .livro-bar-fill{background:var(--gold);}
+
+.livro-count{font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); text-align:right;}
 
 /* ---------- controls ---------- */
 .controls{
@@ -367,6 +423,11 @@ select:focus{outline:none; border-color:var(--green-mid);}
 .modal-link.secondary:hover{background:var(--green-line);}
 
 footer.site{border-top:1px solid var(--line-strong); padding:26px 0 50px; font-size:12.5px; color:var(--ink-faint);}
+footer.site p{margin:0 0 12px;}
+.footer-links{display:flex; flex-direction:column; gap:6px;}
+.footer-links a{color:var(--green-mid); text-decoration:none;}
+.footer-links a:hover{color:var(--gold-deep); text-decoration:underline;}
+.footer-congregacoes{color:var(--ink-faint);}
 
 @media (max-width:640px){
   h1.title{font-size:30px;}
@@ -375,4 +436,8 @@ footer.site{border-top:1px solid var(--line-strong); padding:26px 0 50px; font-s
   select{max-width:none; flex:1 1 44%;}
   .charts-panel{grid-template-columns:1fr;}
   .row-thumb{width:96px;}
+  .header-social svg{width:15px; height:15px;}
+  .header-social{gap:11px;}
+  .livro-row{grid-template-columns:96px 1fr 28px; gap:6px;}
+  .livro-name{font-size:11.5px;}
 }
