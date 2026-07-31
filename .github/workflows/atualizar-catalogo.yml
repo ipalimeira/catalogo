@@ -1,0 +1,38 @@
+name: Atualizar catálogo de vídeos
+
+on:
+  schedule:
+    # Custo de cota é irrisório (~150 unidades no pior caso, de uma cota
+    # diária de 10.000), então rodamos 2x por dia em vez de 1x por
+    # semana -- isso cobre uploads atrasados sem esperar até a próxima
+    # terça. BR não observa horário de verão desde 2019 (fuso sempre
+    # UTC-3), então:
+    - cron: '0 11 * * *'   # 08:00 em Brasília
+    - cron: '0 23 * * *'   # 20:00 em Brasília
+  workflow_dispatch: {}   # botão "Run workflow" manual, pra rodar na hora se quiser
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Rodar atualização incremental
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python3 automacao/atualizar_catalogo.py --pasta .
+
+      - name: Publicar mudanças (se houver)
+        run: |
+          git config user.name "catalogo-bot"
+          git config user.email "actions@github.com"
+          git add data/videos.json data/playlists.json data/revisao_pendente.json
+          git diff --cached --quiet && echo "Nada novo, nada pra commitar." || git commit -m "Atualização automática do catálogo"
+          git push
