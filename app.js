@@ -394,7 +394,11 @@ function renderLivroNav(){
 }
 
 async function init(){
-  const [videosRes, playlistsRes] = await Promise.all([fetch('data/videos.json'), fetch('data/playlists.json')]);
+  const noCache = { cache: 'no-store' };
+  const [videosRes, playlistsRes] = await Promise.all([
+    fetch('data/videos.json', noCache),
+    fetch('data/playlists.json', noCache)
+  ]);
   ALL = await videosRes.json();
   PLAYLISTS = await playlistsRes.json();
 
