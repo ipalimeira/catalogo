@@ -27,7 +27,7 @@ jobs:
       - name: Rodar atualização incremental
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: python3 automacao/atualizar_catalogo.py --pasta .
+        run: python3 atualizar_catalogo.py --pasta .
 
       - name: Publicar mudanças (se houver)
         run: |
