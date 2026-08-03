@@ -55,6 +55,15 @@ BOOK_INDEX = {b: i for i, b in enumerate(BOOK_ORDER)}
 TITULOS_ECLESIASTICOS = ["Rev.", "Pr.", "Pb.", "Sem.", "Dr.", "Rev", "Pr", "Pb", "Sem", "Dr"]
 STOPWORDS_NOME = {"de", "da", "do", "dos", "das", "e"}
 
+# "De-para" pros preletores que mais pregam hoje -- garante a forma
+# canônica certa mesmo num catálogo novo/vazio, sem depender de já
+# existir um vídeo anterior desse preletor pra "aprender" o formato.
+PRELETORES_SEED = [
+    "Jailson Santos (Pastor)",
+    "Renato Santiago (Seminarista)",
+    "Anderson Abreu (Pastor)",
+]
+
 
 # ---------------------------------------------------------------- API HTTP
 
@@ -166,25 +175,61 @@ def fix_book(raw):
     return None
 
 
+# --------------------------------------------------------------------
+# LISTAS DE SINÔNIMOS -- quem publica os vídeos não usa um único rótulo
+# padronizado (ex.: às vezes "Preletor:", às vezes "Prégador:"). Sempre
+# que aparecer um vídeo novo com um rótulo que a automação não
+# reconheceu, é só adicionar a palavra na lista correspondente aqui
+# embaixo -- não precisa mexer em nenhuma regex.
+# --------------------------------------------------------------------
+SINONIMOS_PRELETOR = [
+    "preletor", "preletora", "pregador", "pregadora", "prégador", "prégadora",
+    "predicador", "predicadora", "ministrante", "palestrante",
+]
+SINONIMOS_TEXTO_BASE = [
+    "texto base", "texto bíblico", "texto biblico", "base bíblica", "base biblica",
+    "passagem bíblica", "passagem biblica", "referência bíblica", "referencia biblica",
+    "texto",
+]
+SINONIMOS_TEMA = [
+    "tema", "título", "titulo", "assunto", "mensagem",
+]
+
+
+def extrair_campo_rotulado(descricao, sinonimos):
+    """Procura na descrição uma linha tipo 'Rótulo: valor', aceitando
+    qualquer um dos sinônimos da lista, ':' ou '-'/'–' como separador."""
+    if not descricao:
+        return None
+    padrao = "|".join(re.escape(s) for s in sorted(sinonimos, key=len, reverse=True))
+    m = re.search(rf"(?:{padrao})[ \t]*[:\-–][ \t]*(.+)", descricao, re.IGNORECASE)
+    if not m:
+        return None
+    valor = m.group(1).strip()
+    if not valor:
+        return None  # rótulo presente mas vazio (ex.: "Ministrante: " sem nada depois)
+    primeira_linha = valor.splitlines()[0].strip()
+    return primeira_linha or None
+
+
 def extrair_texto_base(titulo, descricao):
-    # 1) linha explícita "Texto base: ..."
-    m = re.search(r"texto[- ]base\s*:\s*(.+)", descricao or "", re.IGNORECASE)
-    if m:
-        candidato = m.group(1).strip().splitlines()[0].strip()
+    # 1) linha explícita na descrição, com qualquer sinônimo de rótulo
+    candidato = extrair_campo_rotulado(descricao, SINONIMOS_TEXTO_BASE)
+    if candidato:
         return candidato
-    # 2) padrão "Livro cap.vers" no início do título
+    # 2) padrão "Livro cap.vers" (versículo opcional -- cobre também
+    #    títulos de sermão sobre um salmo/capítulo inteiro, ex: "Salmo 122")
     livros_regex = "|".join(re.escape(b) for b in sorted(BOOK_ORDER, key=len, reverse=True))
-    m = re.search(rf"({livros_regex})\s+\d+[.:]\d+(?:-\d+(?:[.:]\d+)?)?", titulo or "")
+    m = re.search(rf"({livros_regex})\s+\d+(?:[.:]\d+(?:-\d+(?:[.:]\d+)?)?)?", titulo or "")
     if m:
         return m.group(0)
     return None
 
 
 def extrair_tema(titulo, descricao):
-    m = re.search(r"tema\s*:\s*(.+)", descricao or "", re.IGNORECASE)
-    if m:
-        tema = m.group(1).strip().splitlines()[0].strip()
-        return tema.strip('“”"\' ')
+    candidato = extrair_campo_rotulado(descricao, SINONIMOS_TEMA)
+    if candidato:
+        return candidato.strip('“”"\' ')
     m = re.search(r"[“\"]([^”\"]+)[”\"]", titulo or "")
     if m:
         return m.group(1).strip()
@@ -201,28 +246,83 @@ def tokens_significativos(nome):
     return {t.lower() for t in re.split(r"\s+", nome) if t.lower() not in STOPWORDS_NOME and t}
 
 
-def extrair_e_normalizar_preletor(titulo, descricao, preletores_conhecidos):
-    raw = None
-    m = re.search(r"com\s+o\s+(.+)", descricao or "", re.IGNORECASE)
-    if m:
-        raw = m.group(1).strip().splitlines()[0].strip()
+PALAVRAS_NAO_NOME = {
+    "parte", "áudio", "audio", "ao", "vivo", "live", "letra", "legendado",
+    "especial", "trecho", "resumo", "final", "completo", "extrato",
+    "conferência", "conferencia", "culto", "manhã", "manha", "noite",
+}
+
+
+def parece_nome_de_pessoa(raw):
+    """Filtro pra não confundir parênteses tipo '(Parte 3)' ou '(áudio)'
+    com o nome de um preletor de verdade."""
     if not raw:
-        m = re.search(r"-\s*([A-ZÀ-Ú][\wÀ-ÿ.\s]+)$", (titulo or "").strip())
-        if m:
-            raw = m.group(1).strip()
+        return False
+    limpo = normalizar_nome(raw)
+    tokens = [t for t in re.split(r"\s+", limpo) if t]
+    if len(tokens) < 2:
+        return False
+    if any(t.isdigit() for t in tokens):
+        return False
+    if any(t.lower() in PALAVRAS_NAO_NOME for t in tokens):
+        return False
+    # cada palavra "de nome" deve começar com maiúscula (ignorando conectivos)
+    for t in tokens:
+        if t.lower() in STOPWORDS_NOME:
+            continue
+        if not t[0].isupper():
+            return False
+    return True
+
+
+def extrair_e_normalizar_preletor(titulo, descricao, preletores_conhecidos):
+    candidatos_brutos = []
+
+    # 1) linha explícita na descrição, com qualquer sinônimo de rótulo
+    candidato = extrair_campo_rotulado(descricao, SINONIMOS_PRELETOR)
+    if candidato:
+        candidatos_brutos.append((candidato, True))
+
+    # 2) variação "Com o Fulano de Tal" -- também explícito
+    m = re.search(r"\bcom\s+o\s+(.+)", descricao or "", re.IGNORECASE)
+    if m:
+        candidatos_brutos.append((m.group(1).strip().splitlines()[0].strip(), True))
+
+    # 3) nome entre parênteses no final do título (padrão comum, mas nem
+    #    sempre é o preletor -- por isso passa pelo filtro de "parece nome")
+    m = re.search(r"\(([^)]+)\)\s*$", (titulo or "").strip())
+    if m:
+        candidatos_brutos.append((m.group(1).strip(), False))
+
+    # 4) nome entre parênteses em qualquer lugar da descrição
+    for m in re.finditer(r"\(([^)]+)\)", descricao or ""):
+        candidatos_brutos.append((m.group(1).strip(), False))
+
+    # 5) título termina com "| Nome", "- Nome", "– Nome" ou "— Nome"
+    m = re.search(r"[|\-–—]\s*([A-ZÀ-Ú][\wÀ-ÿ.\s]+)$", (titulo or "").strip())
+    if m:
+        candidatos_brutos.append((m.group(1).strip(), False))
+
+    raw = None
+    for candidato, confia_direto in candidatos_brutos:
+        if confia_direto or parece_nome_de_pessoa(candidato):
+            raw = candidato
+            break
+
     if not raw:
         return None, False
 
     nome_limpo = normalizar_nome(raw)
     alvo = tokens_significativos(nome_limpo)
 
-    for conhecido in preletores_conhecidos:
+    candidatos_conhecidos = PRELETORES_SEED + list(preletores_conhecidos)
+    for conhecido in candidatos_conhecidos:
         nome_conhecido = re.sub(r"\s*\(.*\)\s*$", "", conhecido)
         tokens_conhecido = tokens_significativos(nome_conhecido)
         if alvo and tokens_conhecido and (alvo <= tokens_conhecido or tokens_conhecido <= alvo):
             return conhecido, True  # match com alta confiança, forma canônica
 
-    return nome_limpo, False  # não achou correspondência -> precisa revisão
+    return nome_limpo, False  # achou um nome, mas não bateu com nenhum conhecido -> revisão manual
 
 
 def classificar_categoria(titulo, duracao_seg):
@@ -351,8 +451,8 @@ def main():
             "texto_base": texto_base,
             "categoria": categoria,
             "preletor": preletor,
-            "titulo": tema or titulo,
-            "titulo_youtube": titulo,
+            "titulo": titulo,
+            "tema": tema,
             "duracao": seconds_to_hhmmss(duracao_seg),
             "duracao_seg": duracao_seg,
             "livro": livro,
